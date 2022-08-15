@@ -1,4 +1,4 @@
-package com.example.weather.model2
+package com.example.weather.model
 
 data class Feels_like(
     val day: Float,

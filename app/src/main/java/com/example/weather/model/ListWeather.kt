@@ -1,4 +1,4 @@
-package com.example.weather.model2
+package com.example.weather.model
 
 data class ListWeather(
     val lat: Float,

@@ -1,4 +1,4 @@
-package com.example.weather
+package com.example.weather.adapter
 
 import kotlin.math.ceil
 import android.view.LayoutInflater
@@ -8,7 +8,9 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
-import com.example.weather.model2.Daily
+import com.example.weather.R
+import com.example.weather.viewmodel.MainViewModel
+import com.example.weather.model.Daily
 
 class MyAdapter : RecyclerView.Adapter<MyAdapter.MyViewHolder>() {
 
@@ -36,8 +38,8 @@ class MyAdapter : RecyclerView.Adapter<MyAdapter.MyViewHolder>() {
     override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
         val daily: Daily = mList[position]
         daily?.let {
-            holder.text1.text = MainActivity.getDateMonth(it.dt)
-            holder.image.load(MainActivity.URL.plus(daily.weather[0].icon) + "@2x.png")
+            holder.text1.text = MainViewModel.getDateMonth(it.dt)
+            holder.image.load(MainViewModel.URL.plus(daily.weather[0].icon) + "@2x.png")
             holder.text2.text =
                 ceil(daily.temp.max).toInt().toString() + "°" + "\t" + ceil(daily.temp.min).toInt().toString() + "°"
             holder.text3.text = " ${daily.weather[0].main}"

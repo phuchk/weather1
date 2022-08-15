@@ -1,7 +1,9 @@
-package com.example.weather.model2
+package com.example.weather.model
 
-data class Hourly(
+data class Current(
     val dt: Int,
+    val sunrise: Int,
+    val sunset: Int,
     val temp: Float,
     val feels_like: Float,
     val pressure: Int,
@@ -14,7 +16,6 @@ data class Hourly(
     val wind_deg: Int,
     val wind_gust: Float,
     val weather: List<Weather>,
-    val pop: Float,
     val rain: Rain
 
 

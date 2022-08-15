@@ -3,33 +3,35 @@ package com.example.weather
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Bundle
-import android.util.Log
+import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
-import com.example.weather.model2.Current
-import com.example.weather.model2.Daily
-import com.example.weather.model2.Weather
-import com.google.android.material.snackbar.Snackbar
-import kotlinx.coroutines.*
-import java.text.SimpleDateFormat
-import java.util.*
+import com.example.weather.adapter.MyAdapter
+import com.example.weather.viewmodel.MainViewModel
+import com.example.weather.model.Current
+import com.example.weather.model.Daily
+import com.example.weather.model.Weather
+import java.lang.NullPointerException
 import kotlin.math.ceil
 
 class MainActivity : AppCompatActivity() {
 
+    lateinit var mainViewModel: MainViewModel
+    private lateinit var sharedPreferences: SharedPreferences
     private lateinit var recyclerView: RecyclerView
     private lateinit var myAdapter: MyAdapter
+    private lateinit var table: TableLayout
     lateinit var edt_lat: EditText
     lateinit var edt_lon: EditText
     lateinit var btn: Button
-
     private lateinit var text1: TextView
     private lateinit var text2: TextView
     private lateinit var text7: TextView
-
     private lateinit var text3: TextView
     private lateinit var text4: TextView
     private lateinit var text5: TextView
@@ -43,111 +45,93 @@ class MainActivity : AppCompatActivity() {
     private lateinit var text14: TextView
     private lateinit var text15: TextView
     private lateinit var text16: TextView
-
     private lateinit var image: ImageView
-    private lateinit var sharedPreferences: SharedPreferences
-
-
-    companion object {
-        const val URL: String = "https://openweathermap.org/img/wn/"
-
-        //convert date from format Unix,utc to format dd-MM-yyyy HH:mm:ss
-        fun calculateDate(int: Int): String {
-            val unixSeconds: Int = int
-            val date: Date = Date(unixSeconds * 1000L)
-            val sdf: SimpleDateFormat = SimpleDateFormat("dd-MM-yyyy HH:mm:ss")
-            sdf.timeZone = TimeZone.getTimeZone("GMT+7")
-            return sdf.format(date)
-        }
-
-        //get hour and minute with type HH:mm
-        fun getHourMinute(int: Int): String {
-            val time: String = calculateDate(int)
-            val arr = time.split(" ")[1].split(":")
-            return arr[0] + ":" + arr[1]
-        }
-
-        //get date and mon with type dd-MM
-        fun getDateMonth(int: Int): String {
-            val time: String = calculateDate(int)
-            val arr = time.split(" ")[0].split("-")
-            return arr[0] + "-" + arr[1]
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        sharedPreferences = this.getSharedPreferences("position", Context.MODE_PRIVATE)
         init()
-        val lat: String = getValueSharePre()[0]
-        val lon: String = getValueSharePre()[1]
-        if (lat != null && lon != null) {
-            edt_lat.setText(lat)
-            edt_lon.setText(lon)
-            callAPI(lat, lon)
+        setupUI();
+        setupViewModel()
+        setupSharePre()
+        btn.setOnClickListener {
+            handleButtonClick()
         }
         myAdapter.onItemClick = {
             handleItemClick(it)
         }
-        btn.setOnClickListener {
+    }
 
-            val lat: String = edt_lat.text.toString()
-            val lon: String = edt_lon.text.toString()
-            try {
-                lat.toFloat()
-                lon.toFloat()
-                callAPI(lat, lon)
-                putValueSharePre(lat, lon)
-            } catch (e: NumberFormatException) {
-                Toast.makeText(this, "Hãy nhập tọa độ là số", Toast.LENGTH_SHORT).show()
+    private fun handleButtonClick() {
+        val lat: String = edt_lat.text.toString()
+        val lon: String = edt_lon.text.toString()
+        try {
+            val a: Float = lat.toFloat()
+            val b: Float = lon.toFloat()
+            val c: Boolean = -90 <= a && a <= 90
+            val d: Boolean = -180 <= b && b <= 180
+            if (!c || !d) {
+                Toast.makeText(this, "Tọa độ không hợp lệ", Toast.LENGTH_SHORT).show()
+                return
             }
+            mainViewModel.callAPI(lat, lon)
+            mainViewModel.putValueSharePre(lat, lon, sharedPreferences)
+            displayView()
+        } catch (e: NumberFormatException) {
+            Toast.makeText(this, "Hãy nhập tọa độ là số", Toast.LENGTH_SHORT).show()
+        } catch (e: NullPointerException) {
+            Toast.makeText(this, "Không được để trống", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun putValueSharePre(lat: String, lon: String) {
-        val editor: SharedPreferences.Editor = sharedPreferences.edit()
-        editor.putString("lat", lat)
-        editor.putString("long", lon)
-        editor.apply()
-        editor.commit()
-    }
 
-    private fun getValueSharePre(): List<String> {
-        val lat = sharedPreferences.getString("lat", "")
-        val lon = sharedPreferences.getString("long", "")
-        return listOf(lat, lon) as List<String>
-    }
-
-    private fun callAPI(lat: String, lon: String) {
-        val api = RetrofitHelper.getInstance().create(myAPI::class.java)
-        GlobalScope.launch(Dispatchers.Main) {
-            //?lat={lat}&lon={lon}&lang=vi&units=metric&appid=${RetrofitHelper.API_KEY}
-            val result = api.getWeather(lat, lon, "vi", "metric", RetrofitHelper.API_KEY)
-            if (result != null) {
-                val body = result.body()
-                if (body != null) {
-                    handleWeatherToday(body.current);
-                    handleWeatherDaily(body.daily)
-                    handleItemClick(body.daily[0])
-                }
-            }
+    private fun setupSharePre() {
+        sharedPreferences = this.getSharedPreferences("position", Context.MODE_PRIVATE)
+        val position = mainViewModel.getValueSharePre(sharedPreferences)
+        val lat: String = position[0]
+        val lon: String = position[1]
+        if (lat.isNotEmpty() && lon.isNotEmpty()) {
+            edt_lat.setText(lat)
+            edt_lon.setText(lon)
+            mainViewModel.callAPI(lat, lon)
+            displayView()
         }
     }
 
-    private fun handleWeatherDaily(daily: List<Daily>) {
-        myAdapter.setList(daily)
+    private fun displayView() {
+        table.visibility = View.VISIBLE
+        text8.visibility = View.VISIBLE
+    }
+
+
+    private fun setupViewModel() {
+        mainViewModel = ViewModelProvider(this).get(MainViewModel::class.java);
+        mainViewModel.getWeathers().observe(this, Observer {
+            myAdapter.setList(it.daily)
+            handleWeatherToday(it.current)
+            handleItemClick(it.daily[0])
+        })
+        mainViewModel.getError().observe(this, Observer {
+            Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
+        })
+    }
+
+    private fun setupUI() {
+        myAdapter = MyAdapter()
+        recyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        recyclerView.adapter = myAdapter
     }
 
     private fun handleWeatherToday(current: Current) {
         val weather: Weather = current.weather[0]
-        image.load(URL.plus(weather.icon + "@2x.png"))
+        image.load(MainViewModel.URL.plus(weather.icon + "@2x.png"))
         text1.text = weather.main
         text2.text = ceil(current.temp).toInt().toString() + " °C"
-        text7.text = getHourMinute(current.dt)
+        text7.text = MainViewModel.getHourMinute(current.dt)
     }
 
-    fun init() {
+    private fun init() {
         image = findViewById(R.id.image_weather_today)
         edt_lat = findViewById(R.id.edt_latitude)
         edt_lon = findViewById(R.id.edt_longitude)
@@ -170,17 +154,15 @@ class MainActivity : AppCompatActivity() {
         text15 = findViewById(R.id.text_rain)
         text16 = findViewById(R.id.text_uvi)
         recyclerView = findViewById(R.id.rev)
-        myAdapter = MyAdapter()
-        recyclerView.layoutManager =
-            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        recyclerView.adapter = myAdapter
+        table = findViewById(R.id.detail_weather)
+
     }
 
     private fun handleItemClick(daily: Daily) {
         text8.text = daily.weather[0].description
-        text3.text = getHourMinute(daily.sunrise)
+        text3.text = MainViewModel.getHourMinute(daily.sunrise)
         text4.text = daily.feels_like.day.toString() + "°C"
-        text5.text = getHourMinute(daily.moonrise)
+        text5.text = MainViewModel.getHourMinute(daily.moonrise)
         text6.text = daily.humidity.toString() + "%"
         text9.text = daily.pressure.toString() + "hPa"
         text10.text = daily.dew_point.toString() + "°C"
